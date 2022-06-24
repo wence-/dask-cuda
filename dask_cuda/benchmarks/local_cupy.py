@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from nvtx import end_range, start_range
 
+import dask
 from dask import array as da
 from dask.distributed import Client, performance_report, wait
 from dask.utils import format_bytes, format_time, parse_bytes
@@ -462,7 +463,14 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    if args.scheduler_file is not None:
-        run_client_from_file(args)
-    else:
-        run_create_client(args)
+    if args.multiprocessing_method == "forkserver":
+        import multiprocessing.forkserver as f
+
+        f.ensure_running()
+    with dask.config.set(
+        {"distributed.worker.multiprocessing-method": args.multiprocessing_method}
+    ):
+        if args.scheduler_file is not None:
+            run_client_from_file(args)
+        else:
+            run_create_client(args)
