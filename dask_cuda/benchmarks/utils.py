@@ -374,13 +374,13 @@ def wait_for_cluster(client, timeout=120, shutdown_on_failure=True):
         )
 
 
-def worker_renamer(workers, multinode):
+def worker_renamer(names, multinode):
     """Produce a function that maps worker names to ``(nodeid,
     deviceid)`` pairs
 
     Parameters
     ----------
-    workers: iterable of ``WorkerState`` objects
+    names: iterable of str
         workers to rename (assumed sorted in some sense)
     multinode: bool
         is this a multinode run?
@@ -394,11 +394,11 @@ def worker_renamer(workers, multinode):
     deviceids = defaultdict(itertools.count)
     hostids = {}
     mapping = {}
-    for worker in workers:
-        _, host, _ = worker.name.split(":")
+    for name in names:
+        _, host, _ = name.split(":")
         hostid = hostids.setdefault(host, len(hostids))
         deviceid = next(deviceids[host])
-        mapping[worker.name] = (hostid, deviceid)
+        mapping[name] = (hostid, deviceid)
     return lambda name: mapping[name]
 
 
