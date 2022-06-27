@@ -15,7 +15,21 @@ from dask_cuda.utils import all_to_all
 
 
 def parse_args():
-    return parse_benchmark_args(description="Explicit comms setup", args_list=[])
+    special_args = [
+        {
+            "name": [
+                "-t",
+                "--type",
+            ],
+            "choices": ["cpu", "gpu"],
+            "default": "gpu",
+            "type": str,
+            "help": "Do merge with GPU or CPU dataframes",
+        },
+    ]
+    return parse_benchmark_args(
+        description="Explicit comms setup", args_list=special_args
+    )
 
 
 def run(client, args):
