@@ -196,11 +196,11 @@ def pretty_print_results(args, message_data, worker_names, results):
     total_nbytes = {}
     for worker, (bws, nbytes) in message_data.items():
         for w2, bw in bws.items():
-            bandwidths[worker.name, w2] = bw
+            bandwidths[worker_names[worker], worker_names[w2]] = bw
         for w2, nbyte in nbytes.items():
-            total_nbytes[worker.name, w2] = nbyte
+            total_nbytes[worker_names[worker], worker_names[w2]] = nbyte
     renamer = worker_renamer(
-        worker_names,
+        list(worker_names.values()),
         args.multi_node or args.sched_addr or args.scheduler_file,
     )
     bandwidths = {
@@ -389,11 +389,10 @@ def aggregate_message_data(ignore_size, dask_worker=None):
     logs = dask_worker.incoming_transfer_log
     bandwidth = defaultdict(list)
     total_nbytes = defaultdict(int)
-    for k, L in logs.items():
-        for d in L:
-            if d["total"] >= ignore_size:
-                bandwidth[d["who"].name].append(d["bandwidth"])
-                total_nbytes[d["who"].name] += d["total"]
+    for d in logs:
+        if d["total"] >= ignore_size:
+            bandwidth[d["who"]].append(d["bandwidth"])
+            total_nbytes[d["who"]] += d["total"]
     bandwidth = {k: np.quantile(v, [0.25, 0.5, 0.75]) for k, v in bandwidth.items()}
     return bandwidth, total_nbytes
 

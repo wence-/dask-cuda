@@ -267,7 +267,7 @@ def get_cluster_options(args):
 
 
 def get_worker_names(dask_scheduler=None):
-    return [w.name for w in dask_scheduler.workers]
+    return {k: w.name for k, w in dask_scheduler.workers.items()}
 
 
 def setup_memory_pool(
