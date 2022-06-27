@@ -16,7 +16,7 @@ from dask.utils import format_bytes, format_time, parse_bytes
 
 from dask_cuda.benchmarks.utils import (
     get_cluster_options,
-    get_scheduler_workers,
+    get_worker_names,
     parse_benchmark_args,
     print_key_value,
     print_separator,
@@ -82,7 +82,7 @@ async def run(args):
         async with Client(
             scheduler_addr if args.multi_node else cluster, asynchronous=True
         ) as client:
-            scheduler_workers = await client.run_on_scheduler(get_scheduler_workers)
+            scheduler_workers = await client.run_on_scheduler(get_worker_names)
 
             await client.run(
                 setup_memory_pool,

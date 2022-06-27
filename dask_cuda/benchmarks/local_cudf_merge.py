@@ -3,6 +3,7 @@ import itertools
 import math
 import operator
 from collections import ChainMap, defaultdict
+from functools import partial
 from time import perf_counter
 from warnings import filterwarnings
 
@@ -17,7 +18,7 @@ from dask.utils import format_bytes, format_time, parse_bytes
 
 from dask_cuda.benchmarks.utils import (
     get_cluster_options,
-    get_scheduler_workers,
+    get_worker_names,
     parse_benchmark_args,
     plot_benchmark,
     print_key_value,
@@ -190,29 +191,24 @@ def bench_once(client, args, write_profile=None):
     return (data_processed, t2 - t1)
 
 
-def pretty_print_results(args, incoming_logs, scheduler_workers, results):
-    bandwidths = defaultdict(list)
-    total_nbytes = defaultdict(list)
-    for k, L in incoming_logs.items():
-        for d in L:
-            if d["total"] >= args.ignore_size:
-                bandwidths[k, d["who"]].append(d["bandwidth"])
-                total_nbytes[k, d["who"]].append(d["total"])
+def pretty_print_results(args, message_data, worker_names, results):
+    bandwidths = {}
+    total_nbytes = {}
+    for worker, (bws, nbytes) in message_data.items():
+        for w2, bw in bws.items():
+            bandwidths[worker.name, w2] = bw
+        for w2, nbyte in nbytes.items():
+            total_nbytes[worker.name, w2] = nbyte
     renamer = worker_renamer(
-        scheduler_workers.values(),
+        worker_names,
         args.multi_node or args.sched_addr or args.scheduler_file,
     )
     bandwidths = {
-        (renamer(scheduler_workers[w1].name), renamer(scheduler_workers[w2].name)): [
-            "%s/s" % format_bytes(x) for x in np.quantile(v, [0.25, 0.50, 0.75])
-        ]
-        for (w1, w2), v in bandwidths.items()
+        (renamer(w1), renamer(w2)): ["%s/s" % format_bytes(x) for x in bw]
+        for (w1, w2), bw in bandwidths.items()
     }
     total_nbytes = {
-        (
-            renamer(scheduler_workers[w1].name),
-            renamer(scheduler_workers[w2].name),
-        ): format_bytes(sum(nb))
+        (renamer(w1), renamer(w2)): format_bytes(nb)
         for (w1, w2), nb in total_nbytes.items()
     }
 
@@ -291,7 +287,7 @@ def pretty_print_results(args, incoming_logs, scheduler_workers, results):
             print("```\n</details>\n")
 
 
-def create_tidy_results(args, incoming_logs, scheduler_workers, results):
+def create_tidy_results(args, message_data, scheduler_workers, results):
     result, *_ = results
     broadcast = (
         False if args.shuffle_join else (True if args.broadcast_join else "default")
@@ -329,6 +325,7 @@ def create_tidy_results(args, incoming_logs, scheduler_workers, results):
         "time_max": times.max(),
     }
     if args.backend == "dask":
+
         # worker-to-worker bandwidth available
         bandwidths = defaultdict(list)
         total_nbytes = defaultdict(list)
@@ -338,7 +335,7 @@ def create_tidy_results(args, incoming_logs, scheduler_workers, results):
             args.multi_node or args.sched_addr or args.scheduler_file,
         )
 
-        for k, L in incoming_logs.items():
+        for k, L in message_data.items():
             source = scheduler_workers[k].name
             for d in L:
                 dest = scheduler_workers[d["who"]].name
@@ -388,9 +385,22 @@ def run_benchmark(client, args):
     return results
 
 
+def aggregate_message_data(ignore_size, dask_worker=None):
+    logs = dask_worker.incoming_transfer_log
+    bandwidth = defaultdict(list)
+    total_nbytes = defaultdict(int)
+    for k, L in logs.items():
+        for d in L:
+            if d["total"] >= ignore_size:
+                bandwidth[d["who"].name].append(d["bandwidth"])
+                total_nbytes[d["who"].name] += d["total"]
+    bandwidth = {k: np.quantile(v, [0.25, 0.5, 0.75]) for k, v in bandwidth.items()}
+    return bandwidth, total_nbytes
+
+
 def gather_bench_results(client, args):
-    scheduler_workers = client.run_on_scheduler(get_scheduler_workers)
-    n_workers = len(scheduler_workers)
+    worker_names = client.run_on_scheduler(get_worker_names)
+    n_workers = len(worker_names)
     client.wait_for_workers(n_workers)
     # Allow the number of chunks to vary between
     # the "base" and "other" DataFrames
@@ -400,8 +410,8 @@ def gather_bench_results(client, args):
         all_to_all(client)
     results = run_benchmark(client, args)
     # Collect, aggregate, and print peer-to-peer bandwidths
-    incoming_logs = client.run(lambda dask_worker: dask_worker.incoming_transfer_log)
-    return scheduler_workers, results, incoming_logs
+    message_data = client.run(partial(aggregate_message_data, args.ignore_size))
+    return worker_names, results, message_data
 
 
 def run(client, args):
@@ -413,12 +423,12 @@ def run(client, args):
         args.disable_rmm_pool,
         args.rmm_log_directory,
     )
-    scheduler_workers, results, incoming_logs = gather_bench_results(client, args)
-    pretty_print_results(args, incoming_logs, scheduler_workers, results)
+    worker_names, results, message_data = gather_bench_results(client, args)
+    pretty_print_results(args, message_data, worker_names, results)
     if args.benchmark_json:
         write_benchmark_data_as_json(
             args.benchmark_json,
-            create_tidy_results(args, incoming_logs, scheduler_workers, results),
+            create_tidy_results(args, message_data, worker_names, results),
         )
 
 

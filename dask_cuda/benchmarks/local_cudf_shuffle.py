@@ -15,7 +15,7 @@ from dask.utils import format_bytes, format_time, parse_bytes
 import dask_cuda.explicit_comms.dataframe.shuffle
 from dask_cuda.benchmarks.utils import (
     get_cluster_options,
-    get_scheduler_workers,
+    get_worker_names,
     parse_benchmark_args,
     plot_benchmark,
     print_key_value,
@@ -110,7 +110,7 @@ def main(args):
             log_directory=args.rmm_log_directory,
         )
 
-    scheduler_workers = client.run_on_scheduler(get_scheduler_workers)
+    scheduler_workers = client.run_on_scheduler(get_worker_names)
     n_workers = len(scheduler_workers)
     client.wait_for_workers(n_workers)
 

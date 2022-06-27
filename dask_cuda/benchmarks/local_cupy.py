@@ -15,7 +15,7 @@ from dask.utils import format_bytes, format_time, parse_bytes
 
 from dask_cuda.benchmarks.utils import (
     get_cluster_options,
-    get_scheduler_workers,
+    get_worker_names,
     parse_benchmark_args,
     print_key_value,
     print_separator,
@@ -334,7 +334,7 @@ def run_benchmark(client, args):
 
 
 def gather_bench_results(client, args):
-    scheduler_workers = client.run_on_scheduler(get_scheduler_workers)
+    scheduler_workers = client.run_on_scheduler(get_worker_names)
     if args.all_to_all:
         all_to_all(client)
     results = run_benchmark(client, args)
