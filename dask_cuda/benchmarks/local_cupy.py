@@ -1,4 +1,5 @@
 import contextlib
+from argparse import Namespace
 from collections import ChainMap
 from time import perf_counter as clock
 
@@ -9,6 +10,7 @@ from nvtx import end_range, start_range
 from dask import array as da
 from dask.distributed import performance_report, wait
 from dask.utils import format_bytes, parse_bytes
+from distributed.client import Client
 
 from dask_cuda.benchmarks.common import Config, execute_benchmark
 from dask_cuda.benchmarks.utils import (
@@ -19,12 +21,11 @@ from dask_cuda.benchmarks.utils import (
 )
 
 
-def bench_once(client, args, write_profile=None):
+def create_input_data(client: Client, args: Namespace):
     if args.type == "gpu":
         import cupy as xp
     else:
         import numpy as xp
-
     # Create a simple random array
     rs = da.random.RandomState(RandomState=xp.random.RandomState)
 
@@ -136,8 +137,20 @@ def bench_once(client, args, write_profile=None):
     else:
         raise ValueError(f"Unknown operation type {args.operation}")
 
+    return func_args, func
+
+
+def bench_once(client, args, input_data, write_profile=None):
+    if args.type == "gpu":
+        import cupy as xp
+    else:
+        import numpy as xp
+
+    func_args, func = input_data
+    x, *_ = func_args
     shape = x.shape
     chunksize = x.chunksize
+
     data_processed = sum(arg.nbytes for arg in func_args)
 
     # Execute the operations to benchmark
@@ -316,6 +329,7 @@ if __name__ == "__main__":
         Config(
             args=parse_args(),
             bench_once=bench_once,
+            create_input_data=create_input_data,
             create_tidy_results=create_tidy_results,
             pretty_print_results=pretty_print_results,
         )

@@ -29,7 +29,7 @@ class Config(NamedTuple):
 
     args: Namespace
     """Parsed benchmark arguments"""
-    bench_once: Callable[[Client, Namespace, Optional[str]], Any]
+    bench_once: Callable[[Client, Namespace, Any, Optional[str]], Any]
     """Callable to run a single benchmark iteration
 
     Parameters
@@ -38,6 +38,8 @@ class Config(NamedTuple):
         distributed Client object
     args
         Benchmark parsed arguments
+    input_data
+        Input data for the benchmark
     write_profile
         Should a profile be written?
 
@@ -45,6 +47,20 @@ class Config(NamedTuple):
     -------
     Benchmark data to be interpreted by ``pretty_print_results`` and
     ``create_tidy_results``.
+    """
+    create_input_data: Callable[[Client, Namespace], Any]
+    """Create input data for the benchmark
+
+    Parameters
+    ----------
+    client
+        distributed Client object
+    args
+        Benchmark parsed arguments
+
+    Returns
+    -------
+    Input data to ``bench_once``
     """
     create_tidy_results: Callable[
         [Namespace, np.ndarray, List[Any]], Tuple[pd.DataFrame, np.ndarray]
@@ -86,11 +102,17 @@ def run_benchmark(client: Client, args: Namespace, config: Config):
     """Run a benchmark a specified number of times
 
     If ``args.profile`` is set, the final run is profiled."""
+    input_data = config.create_input_data(client, args)
+    for _ in range(2):
+        config.bench_once(client, args, input_data, write_profile=None)
     results = []
     for _ in range(max(1, args.runs) - 1):
-        res = config.bench_once(client, args, write_profile=None)
+        res = config.bench_once(client, args, input_data, write_profile=None)
         results.append(res)
-    results.append(config.bench_once(client, args, write_profile=args.profile))
+    results.append(
+        config.bench_once(client, args, input_data, write_profile=args.profile)
+    )
+
     return results
 
 
@@ -162,7 +184,6 @@ def run_create_client(args, config):
     cluster_args = cluster_options["args"]
     cluster_kwargs = cluster_options["kwargs"]
     scheduler_addr = cluster_options["scheduler_addr"]
-
     filterwarnings("ignore", message=".*NVLink.*rmm_pool_size.*", category=UserWarning)
 
     with Cluster(*cluster_args, **cluster_kwargs) as cluster:

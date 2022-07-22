@@ -1,4 +1,5 @@
 import contextlib
+from argparse import Namespace
 from collections import ChainMap
 from time import perf_counter as clock
 
@@ -9,7 +10,7 @@ from cupyx.scipy.ndimage.filters import convolve as cp_convolve
 from scipy.ndimage import convolve as sp_convolve
 
 from dask import array as da
-from dask.distributed import performance_report, wait
+from dask.distributed import Client, performance_report, wait
 from dask.utils import format_bytes, parse_bytes
 
 from dask_cuda.benchmarks.common import Config, execute_benchmark
@@ -29,17 +30,19 @@ def mean_filter(a, shape):
         return sp_convolve(a, a_k)
 
 
-def bench_once(client, args, write_profile=None):
+def create_input_data(client: Client, args: Namespace):
     # Create a simple random array
     if args.type == "gpu":
         rs = da.random.RandomState(RandomState=cp.random.RandomState)
     else:
         rs = da.random.RandomState(RandomState=np.random.RandomState)
     x = rs.random((args.size, args.size), chunks=args.chunk_size).persist()
-    ks = 2 * (2 * args.kernel_size + 1,)
     wait(x)
+    return x
 
-    data_processed = x.nbytes
+
+def bench_once(client, args, x, write_profile=None):
+    ks = 2 * (2 * args.kernel_size + 1,)
 
     # Execute the operations to benchmark
     if args.profile is not None and write_profile is not None:
@@ -52,7 +55,7 @@ def bench_once(client, args, write_profile=None):
         wait(client.persist(x.map_overlap(mean_filter, args.kernel_size, shape=ks)))
         took = clock() - t1
 
-    return (data_processed, took)
+    return (x.nbytes, took)
 
 
 def pretty_print_results(args, address_to_index, p2p_bw, results):
@@ -187,6 +190,7 @@ if __name__ == "__main__":
         Config(
             args=parse_args(),
             bench_once=bench_once,
+            create_input_data=create_input_data,
             create_tidy_results=create_tidy_results,
             pretty_print_results=pretty_print_results,
         )

@@ -1,5 +1,6 @@
 import contextlib
 import math
+from argparse import Namespace
 from collections import ChainMap
 from time import perf_counter
 
@@ -9,7 +10,7 @@ import pandas as pd
 import dask
 from dask.base import tokenize
 from dask.dataframe.core import new_dd_object
-from dask.distributed import performance_report, wait
+from dask.distributed import Client, performance_report, wait
 from dask.utils import format_bytes, parse_bytes
 
 from dask_cuda.benchmarks.common import Config, execute_benchmark
@@ -149,7 +150,7 @@ def merge(args, ddf1, ddf2):
     wait(ddf_join.persist())
 
 
-def bench_once(client, args, write_profile=None):
+def create_input_data(client: Client, args: Namespace):
     # Generate random Dask dataframes
     n_workers = len(client.scheduler_info()["workers"])
     # Allow the number of chunks to vary between
@@ -164,7 +165,11 @@ def bench_once(client, args, write_profile=None):
     ).persist()
     wait(ddf_base)
     wait(ddf_other)
+    return ddf_base, ddf_other
 
+
+def bench_once(client, args, input_data, write_profile=None):
+    ddf_base, ddf_other = input_data
     assert len(ddf_base.dtypes) == 2
     assert len(ddf_other.dtypes) == 2
     data_processed = len(ddf_base) * sum([t.itemsize for t in ddf_base.dtypes])
@@ -182,7 +187,7 @@ def bench_once(client, args, write_profile=None):
             t1 = perf_counter()
             merge(args, ddf_base, ddf_other)
             t2 = perf_counter()
-
+            print("Total join time", t2 - t1)
     return (data_processed, t2 - t1)
 
 
@@ -364,6 +369,7 @@ if __name__ == "__main__":
         Config(
             args=parse_args(),
             bench_once=bench_once,
+            create_input_data=create_input_data,
             create_tidy_results=create_tidy_results,
             pretty_print_results=pretty_print_results,
         )

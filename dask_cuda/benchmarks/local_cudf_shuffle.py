@@ -1,4 +1,5 @@
 import contextlib
+from argparse import Namespace
 from collections import ChainMap
 from time import perf_counter as clock
 
@@ -9,6 +10,7 @@ from dask import array as da
 from dask.dataframe.shuffle import shuffle
 from dask.distributed import performance_report, wait
 from dask.utils import format_bytes, parse_bytes
+from distributed.client import Client
 
 import dask_cuda.explicit_comms.dataframe.shuffle
 from dask_cuda.benchmarks.common import Config, execute_benchmark
@@ -32,8 +34,7 @@ def shuffle_explicit_comms(df):
     )
 
 
-def bench_once(client, args, write_profile=None):
-    # Generate random Dask dataframe
+def create_input_data(client: Client, args: Namespace):
     chunksize = args.partition_size // 8  # Convert bytes to float64
     nchunks = args.in_parts
     totalsize = chunksize * nchunks
@@ -47,6 +48,11 @@ def bench_once(client, args, write_profile=None):
 
     df = df.persist()
     wait(df)
+    return df
+
+
+def bench_once(client, args, df, write_profile=None):
+    # Generate random Dask dataframe
     data_processed = len(df) * sum([t.itemsize for t in df.dtypes])
 
     if write_profile is None:
@@ -183,6 +189,7 @@ if __name__ == "__main__":
         Config(
             args=parse_args(),
             bench_once=bench_once,
+            create_input_data=create_input_data,
             create_tidy_results=create_tidy_results,
             pretty_print_results=pretty_print_results,
         )
