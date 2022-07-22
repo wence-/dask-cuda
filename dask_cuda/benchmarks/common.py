@@ -98,6 +98,23 @@ class Config(NamedTuple):
     """
 
 
+def start_yappi():
+    import yappi
+
+    yappi.start(builtins=True, profile_threads=True)
+
+
+def stop_yappi():
+    import os
+
+    import yappi
+
+    yappi.stop()
+    yappi.get_func_stats().save(
+        f"/root/outdir/merge-profile-{os.getpid()}.pstats", type="pstat"
+    )
+
+
 def run_benchmark(client: Client, args: Namespace, config: Config):
     """Run a benchmark a specified number of times
 
@@ -106,6 +123,7 @@ def run_benchmark(client: Client, args: Namespace, config: Config):
     for _ in range(2):
         config.bench_once(client, args, input_data, write_profile=None)
     results = []
+    client.run(start_yappi)
     for _ in range(max(1, args.runs) - 1):
         res = config.bench_once(client, args, input_data, write_profile=None)
         results.append(res)
@@ -113,6 +131,7 @@ def run_benchmark(client: Client, args: Namespace, config: Config):
         config.bench_once(client, args, input_data, write_profile=args.profile)
     )
 
+    client.run(stop_yappi)
     return results
 
 
