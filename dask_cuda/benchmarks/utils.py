@@ -293,12 +293,14 @@ def get_cluster_options(args):
 
 
 def get_worker_device():
-    try:
-        device, *_ = os.environ["CUDA_VISIBLE_DEVICES"].split(",")
-        return int(device)
-    except (KeyError, ValueError):
-        # No CUDA_VISIBILE_DEVICES in environment, or else no appropriate value
+    from distributed.diagnostics.nvml import has_cuda_context
+
+    device_id = has_cuda_context()
+    if device_id is False:  # FIXME: antipattern, but no Maybe type
+        # No current device
         return -1
+    else:
+        return device_id
 
 
 def setup_memory_pool(

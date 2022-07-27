@@ -91,6 +91,7 @@ def worker_spec(
         )
     if isinstance(CUDA_VISIBLE_DEVICES, str):
         CUDA_VISIBLE_DEVICES = CUDA_VISIBLE_DEVICES.split(",")
+    # TODO: MIG/UUID
     CUDA_VISIBLE_DEVICES = list(map(int, CUDA_VISIBLE_DEVICES))
     memory_limit = MEMORY_LIMIT / get_gpu_count()
 

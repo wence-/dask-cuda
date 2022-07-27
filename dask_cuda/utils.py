@@ -271,6 +271,8 @@ def get_device_total_memory(index=0):
 
 
 def get_ucx_config(
+    cuda_device,
+    *,
     enable_tcp_over_ucx=None,
     enable_infiniband=None,
     enable_nvlink=None,
@@ -278,6 +280,7 @@ def get_ucx_config(
 ):
     ucx_config = dask.config.get("distributed.comm.ucx").copy()
 
+    ucx_config[canonical_name("cuda-device", ucx_config)] = cuda_device
     ucx_config[canonical_name("create-cuda-context", ucx_config)] = True
     ucx_config[canonical_name("reuse-endpoints", ucx_config)] = False
 
@@ -546,7 +549,7 @@ def nvml_device_index(i, CUDA_VISIBLE_DEVICES):
     >>> nvml_device_index(1, ["GPU-84fd49f2-48ad-50e8-9f2e-3bf0dfd47ccb",
                               "GPU-d6ac2d46-159b-5895-a854-cb745962ef0f",
                               "GPU-158153b7-51d0-5908-a67c-f406bc86be17"])
-    "MIG-d6ac2d46-159b-5895-a854-cb745962ef0f"
+    "GPU-d6ac2d46-159b-5895-a854-cb745962ef0f"
     >>> nvml_device_index(2, ["MIG-41b3359c-e721-56e5-8009-12e5797ed514",
                               "MIG-65b79fff-6d3c-5490-a288-b31ec705f310",
                               "MIG-c6e2bae8-46d4-5a7e-9a68-c6cf1f680ba0"])

@@ -71,22 +71,20 @@ class CUDAWorker(Server):
     ):
         # Required by RAPIDS libraries (e.g., cuDF) to ensure no context
         # initialization happens before we can set CUDA_VISIBLE_DEVICES
+        # context creation is handled in distributed.comm.ucx.init_once
         os.environ["RAPIDS_NO_INITIALIZE"] = "True"
 
         enable_proctitle_on_current()
         enable_proctitle_on_children()
 
-        try:
-            nprocs = len(os.environ["CUDA_VISIBLE_DEVICES"].split(","))
-        except KeyError:
-            nprocs = get_n_gpus()
+        ngpus = get_n_gpus()
 
         if nthreads < 1:
             raise ValueError("nthreads must be higher than 0.")
 
-        # Set nthreads=1 when parsing mem_limit since it only depends on nprocs
+        # Set nthreads=1 when parsing mem_limit since it only depends on ngpus
         memory_limit = parse_memory_limit(
-            memory_limit=memory_limit, nthreads=1, total_cores=nprocs
+            memory_limit=memory_limit, nthreads=1, total_cores=ngpus
         )
 
         if pid_file:
@@ -211,10 +209,13 @@ class CUDAWorker(Server):
                 preload=(list(preload) or []) + ["dask_cuda.initialize"],
                 preload_argv=(list(preload_argv) or []) + ["--create-cuda-context"],
                 security=security,
-                env={"CUDA_VISIBLE_DEVICES": cuda_visible_devices(i)},
                 plugins={
                     CPUAffinity(
-                        get_cpu_affinity(nvml_device_index(i, cuda_visible_devices(i)))
+                        get_cpu_affinity(
+                            nvml_device_index(
+                                cuda_device, cuda_visible_devices(cuda_device)
+                            )
+                        )
                     ),
                     RMMSetup(
                         rmm_pool_size,
@@ -226,21 +227,26 @@ class CUDAWorker(Server):
                     ),
                     PreImport(pre_import),
                 },
-                name=name if nprocs == 1 or name is None else str(name) + "-" + str(i),
+                name=name
+                if ngpus == 1 or name is None
+                else str(name) + "-" + str(cuda_device),
                 local_directory=local_directory,
                 config={
                     "distributed.comm.ucx": get_ucx_config(
+                        cuda_device,
                         enable_tcp_over_ucx=enable_tcp_over_ucx,
                         enable_infiniband=enable_infiniband,
                         enable_nvlink=enable_nvlink,
                         enable_rdmacm=enable_rdmacm,
                     )
                 },
-                data=data(nvml_device_index(i, cuda_visible_devices(i))),
+                data=data(
+                    nvml_device_index(cuda_device, cuda_visible_devices(cuda_device))
+                ),
                 worker_class=worker_class,
                 **kwargs,
             )
-            for i in range(nprocs)
+            for cuda_device in range(ngpus)
         ]
 
     def __await__(self):
