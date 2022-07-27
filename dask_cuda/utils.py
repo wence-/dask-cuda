@@ -276,7 +276,7 @@ def get_ucx_config(
     enable_nvlink=None,
     enable_rdmacm=None,
 ):
-    ucx_config = dask.config.get("distributed.comm.ucx")
+    ucx_config = dask.config.get("distributed.comm.ucx").copy()
 
     ucx_config[canonical_name("create-cuda-context", ucx_config)] = True
     ucx_config[canonical_name("reuse-endpoints", ucx_config)] = False
