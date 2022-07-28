@@ -107,6 +107,7 @@ def initialize(
         requires ``enable_infiniband=True``.
     """
     ucx_config = get_ucx_config(
+        cuda_device=0,
         enable_tcp_over_ucx=enable_tcp_over_ucx,
         enable_infiniband=enable_infiniband,
         enable_nvlink=enable_nvlink,

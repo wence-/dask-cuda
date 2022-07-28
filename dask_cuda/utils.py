@@ -271,8 +271,8 @@ def get_device_total_memory(index=0):
 
 
 def get_ucx_config(
-    cuda_device,
     *,
+    cuda_device: int = 0,
     enable_tcp_over_ucx=None,
     enable_infiniband=None,
     enable_nvlink=None,
@@ -280,6 +280,8 @@ def get_ucx_config(
 ):
     ucx_config = dask.config.get("distributed.comm.ucx").copy()
 
+    # Which device (logical indexing) are we going to create a cuda
+    # context on when we call ucx.init_once()?
     ucx_config[canonical_name("cuda-device", ucx_config)] = cuda_device
     ucx_config[canonical_name("create-cuda-context", ucx_config)] = True
     ucx_config[canonical_name("reuse-endpoints", ucx_config)] = False

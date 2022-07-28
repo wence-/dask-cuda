@@ -72,6 +72,19 @@ class CUDAWorker(Server):
         enable_proctitle_on_current()
         enable_proctitle_on_children()
 
+        # Idea, the external environment specifies
+        # CUDA_VISIBLE_DEVICES, or else we use all GPUs. There are two
+        # indexing conventions, the first is the logical indexing used
+        # by the CUDA runtime to select devices, the second is the
+        # physical indexing used by pynvml. We can match these two up
+        # by inspecting the UUID of the devices.
+        # CUDA contexts are created on each device when we initialise
+        # UCX. To do so, we need to pass the relevant device through
+        # into distributed.comm.ucx.init_once. We do so with the
+        # configuration key "distributed.comm.ucx.cuda-device". This
+        # is referenced relative to the logical index in the
+        # CUDA_VISIBLE_DEVICES list. This works fine if
+        # CUDA_VISIBLE_DEVICES lists UUIDs, rather than device indices.
         ngpus = get_n_gpus()
 
         if nthreads < 1:
@@ -227,13 +240,11 @@ class CUDAWorker(Server):
                     ),
                     PreImport(pre_import),
                 },
-                name=name
-                if ngpus == 1 or name is None
-                else str(name) + "-" + str(cuda_device),
+                name=name if ngpus == 1 or name is None else f"{name}-{cuda_device}",
                 local_directory=local_directory,
                 config={
                     "distributed.comm.ucx": get_ucx_config(
-                        cuda_device,
+                        cuda_device=cuda_device,
                         enable_tcp_over_ucx=enable_tcp_over_ucx,
                         enable_infiniband=enable_infiniband,
                         enable_nvlink=enable_nvlink,
