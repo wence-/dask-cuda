@@ -231,6 +231,7 @@ class CUDAWorker(Server):
                         )
                     ),
                     RMMSetup(
+                        cuda_device,
                         rmm_pool_size,
                         rmm_maximum_pool_size,
                         rmm_managed_memory,

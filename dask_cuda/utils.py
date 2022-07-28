@@ -38,6 +38,7 @@ class CPUAffinity:
 class RMMSetup:
     def __init__(
         self,
+        cuda_device,
         initial_pool_size,
         maximum_pool_size,
         managed_memory,
@@ -51,6 +52,7 @@ class RMMSetup:
                 "`rmm_pool_size`.`rmm_pool_size` must be specified to use RMM pool."
             )
 
+        self.cuda_device = cuda_device
         self.initial_pool_size = initial_pool_size
         self.maximum_pool_size = maximum_pool_size
         self.managed_memory = managed_memory
@@ -76,6 +78,7 @@ class RMMSetup:
             pool_allocator = False if self.initial_pool_size is None else True
 
             rmm.reinitialize(
+                devices=self.cuda_device,
                 pool_allocator=pool_allocator,
                 managed_memory=self.managed_memory,
                 initial_pool_size=self.initial_pool_size,

@@ -310,6 +310,7 @@ def setup_memory_pool(
     log_directory=None,
 ):
     import cupy
+    import numba.cuda
 
     import rmm
 
@@ -320,7 +321,7 @@ def setup_memory_pool(
     if not disable_pool:
         rmm.reinitialize(
             pool_allocator=True,
-            devices=0,
+            devices=numba.cuda.get_current_device().id,
             initial_pool_size=pool_size,
             logging=logging,
             log_file_name=get_rmm_log_file_name(dask_worker, logging, log_directory),
