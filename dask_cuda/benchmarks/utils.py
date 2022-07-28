@@ -293,14 +293,14 @@ def get_cluster_options(args):
 
 
 def get_worker_device():
-    from distributed.diagnostics.nvml import has_cuda_context
+    from distributed.diagnostics.nvml import device_of_cuda_context
 
-    device_id = has_cuda_context()
-    if device_id is False:  # FIXME: antipattern, but no Maybe type
+    device_id = device_of_cuda_context()
+    if device_id is None:
         # No current device
         return -1
     else:
-        return device_id
+        return device_id.physical_id
 
 
 def setup_memory_pool(
