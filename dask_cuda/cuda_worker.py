@@ -69,11 +69,6 @@ class CUDAWorker(Server):
         pre_import=None,
         **kwargs,
     ):
-        # Required by RAPIDS libraries (e.g., cuDF) to ensure no context
-        # initialization happens before we can set CUDA_VISIBLE_DEVICES
-        # context creation is handled in distributed.comm.ucx.init_once
-        os.environ["RAPIDS_NO_INITIALIZE"] = "True"
-
         enable_proctitle_on_current()
         enable_proctitle_on_children()
 
@@ -197,6 +192,11 @@ class CUDAWorker(Server):
         self.nannies = [
             Nanny(
                 scheduler,
+                # Required by RAPIDS libraries (e.g., cuDF) to ensure
+                # no context initialization happens before we can
+                # select the device correctly in
+                # distributed.comm.ucx.init_once
+                env={"RAPIDS_NO_INITIALIZE", "True"},
                 scheduler_file=scheduler_file,
                 nthreads=nthreads,
                 dashboard=dashboard,
