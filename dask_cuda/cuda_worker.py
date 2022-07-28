@@ -209,7 +209,7 @@ class CUDAWorker(Server):
                 # no context initialization happens before we can
                 # select the device correctly in
                 # distributed.comm.ucx.init_once
-                env={"RAPIDS_NO_INITIALIZE", "True"},
+                env={"RAPIDS_NO_INITIALIZE": "True"},
                 scheduler_file=scheduler_file,
                 nthreads=nthreads,
                 dashboard=dashboard,
