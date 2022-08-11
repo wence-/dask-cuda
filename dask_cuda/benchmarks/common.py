@@ -184,7 +184,10 @@ def execute_benchmark(config: Config):
 
         f.ensure_running()
     with dask.config.set(
-        {"distributed.worker.multiprocessing-method": args.multiprocessing_method}
+        {
+            "distributed.worker.multiprocessing-method": args.multiprocessing_method,
+            **dict(args.dask_config),
+        }
     ):
         if args.scheduler_file is not None or args.scheduler_address is not None:
             run_client_from_existing_scheduler(args, config)
