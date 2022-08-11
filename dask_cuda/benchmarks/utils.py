@@ -235,11 +235,12 @@ def parse_benchmark_args(description="Generic dask-cuda Benchmark", args_list=[]
         help="Key-value pairs to set in the dask config when running the benchmark. "
         "Can provide multiple times to set multiple values.",
     )
+    group = parser.add_argument_group(description="Benchmark-specific configuration")
     for args in args_list:
         name = args.pop("name")
         if not isinstance(name, list):
             name = [name]
-        parser.add_argument(*name, **args)
+        group.add_argument(*name, **args)
 
     args = parser.parse_args()
 
