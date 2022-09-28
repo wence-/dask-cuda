@@ -74,10 +74,11 @@ def _test_dataframe_merge_empty_partitions(nrows, npartitions):
             expected = df1.merge(df2).set_index("key")
             ddf1 = dd.from_pandas(df1, npartitions=npartitions)
             ddf2 = dd.from_pandas(df2, npartitions=npartitions)
-            with dask.config.set(explicit_comms=True):
-                ddf3 = ddf1.merge(ddf2, on=["key"]).set_index("key")
-                got = ddf3.compute()
-                pd.testing.assert_frame_equal(got, expected)
+            ddf3 = ddf1.merge(ddf2, shuffle="explicit-comms", on=["key"]).set_index(
+                "key"
+            )
+            got = ddf3.compute()
+            pd.testing.assert_frame_equal(got, expected)
 
 
 def test_dataframe_merge_empty_partitions():
@@ -131,7 +132,10 @@ def _test_dataframe_shuffle(backend, protocol, n_workers):
                         workers=all_workers
                     )
                     ddf = explicit_comms_shuffle(
-                        ddf, ["key"], npartitions=output_nparts
+                        ddf,
+                        ["key"],
+                        npartitions=output_nparts,
+                        shuffle="explicit-comms",
                     ).persist()
 
                     assert ddf.npartitions == output_nparts
@@ -187,10 +191,6 @@ def _test_dask_use_explicit_comms():
             assert any(name in str(key) for key in res.dask)
         else:  # If not in cluster, we cannot use explicit comms
             assert all(name not in str(key) for key in res.dask)
-
-        # Passing explicit `shuffle="tasks"` argument
-        res = dd.shuffle.shuffle(ddf, "key", npartitions=4, shuffle="tasks")
-        assert all(name not in str(key) for key in res.dask)
 
     with LocalCluster(
         protocol="tcp",
@@ -253,8 +253,11 @@ def _test_dataframe_shuffle_merge(backend, protocol, n_workers):
             ddf2 = dd.from_pandas(
                 df2, npartitions=n_workers - 1 if n_workers > 1 else 1
             )
-            with dask.config.set(explicit_comms=True):
-                got = ddf1.merge(ddf2, on="key").set_index("key").compute()
+            got = (
+                ddf1.merge(ddf2, shuffle="explicit-comms", on="key")
+                .set_index("key")
+                .compute()
+            )
             assert_eq(got, expected)
 
 
@@ -290,7 +293,7 @@ def _test_jit_unspill(protocol):
                 pd.DataFrame({"key": np.random.random(100)})
             )
             ddf = dd.from_pandas(df.copy(), npartitions=4)
-            ddf = explicit_comms_shuffle(ddf, ["key"])
+            ddf = explicit_comms_shuffle(ddf, ["key"], shuffle="explicit-comms")
 
             # Check the values of `ddf` (ignoring the row order)
             expected = df.sort_values("key")
