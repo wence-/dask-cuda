@@ -10,19 +10,17 @@ import dask.dataframe.shuffle
 
 from ._version import get_versions
 from .cuda_worker import CUDAWorker
-from .explicit_comms.dataframe.shuffle import get_rearrange_by_column_wrapper
+from .explicit_comms.dataframe.shuffle import can_use_ec_shuffle, shuffle as ec_shuffle
 from .local_cuda_cluster import LocalCUDACluster
 from .proxify_device_objects import proxify_decorator, unproxify_decorator
 
 __version__ = get_versions()["version"]
 del get_versions
 
-
-# Monkey patching Dask to make use of explicit-comms when `DASK_EXPLICIT_COMMS=True`
-dask.dataframe.shuffle.rearrange_by_column = get_rearrange_by_column_wrapper(
-    dask.dataframe.shuffle.rearrange_by_column
-)
-
+# Register explicit-comms shuffle
+registry = dask.dataframe.shuffle.shuffle_registry
+registry.register(max(registry.known_priorities) + 1, can_use_ec_shuffle, ec_shuffle)
+del registry
 
 # Monkey patching Dask to make use of proxify and unproxify in compatibility mode
 dask.dataframe.shuffle.shuffle_group = proxify_decorator(
